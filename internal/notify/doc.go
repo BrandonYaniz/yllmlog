@@ -1,3 +1,2 @@
+// Package notify delivers reports and alerts through configured channels.
 package notify
-
-// Package notify contains the notify layer for yllmlog.
