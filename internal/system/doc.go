@@ -1,3 +1,2 @@
+// Package system contains operating-system specific defaults and helpers.
 package system
-
-// Package system contains the system layer for yllmlog.

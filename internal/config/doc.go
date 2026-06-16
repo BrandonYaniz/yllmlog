@@ -1,3 +1,2 @@
+// Package config loads and validates the minimal file configuration.
 package config
-
-// Package config contains the config layer for yllmlog.
