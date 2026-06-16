@@ -1,18 +1,12 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"os"
 
-	"github.com/BrandonYaniz/yllmlog/internal/version"
+	"github.com/BrandonYaniz/yllmlog/internal/cli"
 )
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Println(version.Current())
-		return
-	}
-
-	fmt.Println("yllmlog CLI skeleton")
-	fmt.Println("Run `yllmlog version` to print the current version.")
+	os.Exit(cli.Run(context.Background(), os.Args[1:], os.Stdout, os.Stderr))
 }
