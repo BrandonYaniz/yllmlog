@@ -2,7 +2,12 @@ package socket
 
 import "encoding/json"
 
-const ActionStatus = "status"
+const (
+	ActionStatus     = "status"
+	ActionLogsList   = "logs.list"
+	ActionLogsAdd    = "logs.add"
+	ActionLogsRemove = "logs.remove"
+)
 
 // Request is one daemon API request.
 type Request struct {
@@ -23,4 +28,13 @@ type Response struct {
 type Status struct {
 	Version string `json:"version"`
 	Ready   bool   `json:"ready"`
+}
+
+type LogsAddParams struct {
+	Path        string `json:"path"`
+	ServiceName string `json:"service_name,omitempty"`
+}
+
+type LogsRemoveParams struct {
+	Path string `json:"path"`
 }
