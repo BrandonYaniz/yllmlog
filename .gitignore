@@ -1,0 +1,20 @@
+.codex/
+
+# Go
+/bin/
+/dist/
+*.test
+*.out
+coverage.out
+
+# Local runtime
+*.db
+*.db-shm
+*.db-wal
+*.sock
+*.pid
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
