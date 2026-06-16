@@ -1,3 +1,2 @@
+// Package socket implements the local Unix socket request protocol.
 package socket
-
-// Package socket contains the socket layer for yllmlog.
