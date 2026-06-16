@@ -81,6 +81,17 @@ CREATE TABLE watched_logs (
     enabled INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE log_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    watched_log_id INTEGER NOT NULL REFERENCES watched_logs(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    device TEXT,
+    inode TEXT,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    offset_bytes INTEGER NOT NULL DEFAULT 0,
+    last_seen_at TEXT,
+    UNIQUE(watched_log_id, path)
 );`); err != nil {
 		t.Fatalf("create watched_logs: %v", err)
 	}
