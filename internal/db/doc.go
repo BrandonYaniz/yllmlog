@@ -1,3 +1,2 @@
+// Package db opens SQLite databases and applies schema migrations.
 package db
-
-// Package db contains the db layer for yllmlog.
