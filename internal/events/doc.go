@@ -1,3 +1,2 @@
+// Package events groups repeated log lines into persistent issue records.
 package events
-
-// Package events contains the events layer for yllmlog.
