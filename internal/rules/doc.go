@@ -1,3 +1,2 @@
+// Package rules evaluates log lines against ordered rule definitions.
 package rules
-
-// Package rules contains the rules layer for yllmlog.
