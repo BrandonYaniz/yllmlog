@@ -3,13 +3,17 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/BrandonYaniz/yllmlog/internal/config"
 	"github.com/BrandonYaniz/yllmlog/internal/logs"
 	"github.com/BrandonYaniz/yllmlog/internal/socket"
 	"github.com/BrandonYaniz/yllmlog/internal/system"
+	"github.com/BrandonYaniz/yllmlog/migrations"
 )
 
 func TestDaemonStatus(t *testing.T) {
@@ -48,6 +52,71 @@ func TestDaemonStatus(t *testing.T) {
 	}
 	if status.Version == "" {
 		t.Fatal("daemon status version is empty")
+	}
+}
+
+func TestDaemonProcessesWatchedLog(t *testing.T) {
+	tempDir := t.TempDir()
+	socketDir, err := os.MkdirTemp("/tmp", "yllmlog-daemon-")
+	if err != nil {
+		t.Fatalf("create socket temp dir: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(socketDir) })
+	logPath := filepath.Join(tempDir, "messages")
+	if err := os.WriteFile(logPath, []byte("disk error 42\n"), 0o600); err != nil {
+		t.Fatalf("write log: %v", err)
+	}
+	cfg := config.DefaultForPaths(system.Paths{
+		DataDir:      filepath.Join(tempDir, "data"),
+		DaemonSocket: filepath.Join(socketDir, "yllmlog.sock"),
+		YLLMDSocket:  filepath.Join(socketDir, "yllmd.sock"),
+		YLLMDProfile: "phi",
+	})
+
+	daemon, err := New(context.Background(), cfg, migrations.FS, ".")
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+	daemon.pollInterval = 10 * time.Millisecond
+	if _, err := daemon.db.Exec(`
+INSERT INTO watched_logs(path, service_name) VALUES(?, 'system');
+INSERT INTO rules(name, source, matcher, pattern, action, priority, enabled)
+VALUES('disk errors', 'system_default', 'contains', 'disk error', 'escalate', 10, 1);
+`, logPath); err != nil {
+		daemon.Close()
+		t.Fatalf("seed database: %v", err)
+	}
+	if err := daemon.Listen(); err != nil {
+		daemon.Close()
+		t.Fatalf("Listen returned error: %v", err)
+	}
+	t.Cleanup(func() { daemon.Close() })
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		var count int
+		if err := daemon.db.QueryRow("SELECT COUNT(*) FROM events").Scan(&count); err != nil {
+			t.Fatalf("count events: %v", err)
+		}
+		if count == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("daemon did not process watched log before deadline")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	response, err := socket.Do(context.Background(), cfg.Daemon.Socket, socket.Request{Action: socket.ActionStatus})
+	if err != nil {
+		t.Fatalf("status request returned error: %v", err)
+	}
+	status, err := socket.DecodeResult[socket.Status](response)
+	if err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	if status.LastCycleAt == "" || status.LastCycleError != "" {
+		t.Fatalf("status = %+v", status)
 	}
 }
 

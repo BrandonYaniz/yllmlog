@@ -26,8 +26,10 @@ type Response struct {
 
 // Status reports daemon readiness.
 type Status struct {
-	Version string `json:"version"`
-	Ready   bool   `json:"ready"`
+	Version        string `json:"version"`
+	Ready          bool   `json:"ready"`
+	LastCycleAt    string `json:"last_cycle_at,omitempty"`
+	LastCycleError string `json:"last_cycle_error,omitempty"`
 }
 
 type LogsAddParams struct {
