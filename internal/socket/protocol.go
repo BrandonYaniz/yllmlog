@@ -7,6 +7,8 @@ const (
 	ActionLogsList   = "logs.list"
 	ActionLogsAdd    = "logs.add"
 	ActionLogsRemove = "logs.remove"
+	ActionIssuesList = "issues.list"
+	ActionIssuesGet  = "issues.get"
 )
 
 // Request is one daemon API request.
@@ -39,4 +41,8 @@ type LogsAddParams struct {
 
 type LogsRemoveParams struct {
 	Path string `json:"path"`
+}
+
+type IssuesGetParams struct {
+	ID int64 `json:"id"`
 }

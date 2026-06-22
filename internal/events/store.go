@@ -109,12 +109,7 @@ SELECT id, fingerprint, COALESCE(service_name, ''), severity, COALESCE(summary, 
 FROM events
 WHERE fingerprint = ?;
 `, fingerprint)
-
-	var event Event
-	if err := row.Scan(&event.ID, &event.Fingerprint, &event.ServiceName, &event.Severity, &event.Summary, &event.FirstSeenAt, &event.LastSeenAt, &event.TotalOccurrences, &event.TodayOccurrences, &event.LastHourOccurrences); err != nil {
-		return Event{}, fmt.Errorf("read event: %w", err)
-	}
-	return event, nil
+	return scanEvent(row)
 }
 
 func updateCounters(ctx context.Context, tx *sql.Tx, eventID int64, now time.Time) error {

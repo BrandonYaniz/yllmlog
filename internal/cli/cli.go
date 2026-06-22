@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/BrandonYaniz/yllmlog/internal/config"
+	"github.com/BrandonYaniz/yllmlog/internal/events"
 	"github.com/BrandonYaniz/yllmlog/internal/logs"
 	"github.com/BrandonYaniz/yllmlog/internal/socket"
 	"github.com/BrandonYaniz/yllmlog/internal/version"
@@ -54,10 +56,71 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			targetSocket = *socketPath
 		}
 		return logsCommand(ctx, targetSocket, flags.Args()[1:], stdout, stderr)
+	case "issues":
+		cfg, err := loadConfig(*configPath)
+		if err != nil {
+			fmt.Fprintf(stderr, "load config: %v\n", err)
+			return 1
+		}
+		targetSocket := cfg.Daemon.Socket
+		if *socketPath != "" {
+			targetSocket = *socketPath
+		}
+		return issuesCommand(ctx, targetSocket, flags.Args()[1:], stdout, stderr)
 	default:
 		printUsage(stdout)
 		return 0
 	}
+}
+
+func issuesCommand(ctx context.Context, socketPath string, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		response, err := socket.Do(ctx, socketPath, socket.Request{Action: socket.ActionIssuesList})
+		if err != nil {
+			fmt.Fprintf(stderr, "issues: %v\n", err)
+			return 1
+		}
+		listed, err := socket.DecodeResult[[]events.Event](response)
+		if err != nil {
+			fmt.Fprintf(stderr, "issues: %v\n", err)
+			return 1
+		}
+		for _, event := range listed {
+			fmt.Fprintf(stdout, "%d\t%s\t%s\t%d\t%s\n", event.ID, event.Severity, event.ServiceName, event.TotalOccurrences, event.Summary)
+		}
+		return 0
+	}
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "issues accepts at most one event id")
+		return 2
+	}
+
+	id, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil || id <= 0 {
+		fmt.Fprintln(stderr, "issue id must be a positive integer")
+		return 2
+	}
+	params, err := json.Marshal(socket.IssuesGetParams{ID: id})
+	if err != nil {
+		fmt.Fprintf(stderr, "issues: %v\n", err)
+		return 1
+	}
+	response, err := socket.Do(ctx, socketPath, socket.Request{Action: socket.ActionIssuesGet, Params: params})
+	if err != nil {
+		fmt.Fprintf(stderr, "issues: %v\n", err)
+		return 1
+	}
+	detail, err := socket.DecodeResult[events.Detail](response)
+	if err != nil {
+		fmt.Fprintf(stderr, "issues: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Issue %d [%s] %s\n", detail.Event.ID, detail.Event.Severity, detail.Event.Summary)
+	fmt.Fprintf(stdout, "Service: %s\nOccurrences: %d\nFirst seen: %s\nLast seen: %s\n", detail.Event.ServiceName, detail.Event.TotalOccurrences, detail.Event.FirstSeenAt, detail.Event.LastSeenAt)
+	for _, occurrence := range detail.Occurrences {
+		fmt.Fprintf(stdout, "%s\t%s\n", occurrence.OccurredAt, occurrence.Line)
+	}
+	return 0
 }
 
 func loadConfig(path string) (config.Config, error) {
@@ -179,6 +242,7 @@ func logsRemove(ctx context.Context, socketPath, path string, stdout, stderr io.
 func printUsage(stdout io.Writer) {
 	fmt.Fprintln(stdout, "Usage: yllmlog [--config path] [--socket path] <command>")
 	fmt.Fprintln(stdout, "Commands:")
+	fmt.Fprintln(stdout, "  issues   List issues or show one issue")
 	fmt.Fprintln(stdout, "  logs     Manage watched logs")
 	fmt.Fprintln(stdout, "  status   Show daemon status")
 	fmt.Fprintln(stdout, "  version  Print CLI version")

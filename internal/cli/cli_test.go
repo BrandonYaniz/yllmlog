@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/BrandonYaniz/yllmlog/internal/events"
 	"github.com/BrandonYaniz/yllmlog/internal/logs"
 	"github.com/BrandonYaniz/yllmlog/internal/socket"
 )
@@ -19,6 +20,51 @@ func TestRunVersion(t *testing.T) {
 	}
 	if strings.TrimSpace(stdout.String()) == "" {
 		t.Fatal("version output is empty")
+	}
+}
+
+func TestRunIssuesCommands(t *testing.T) {
+	socketPath := t.TempDir() + "/yllmlog.sock"
+	event := events.Event{ID: 7, Severity: "critical", ServiceName: "disk", Summary: "disk full", TotalOccurrences: 3, FirstSeenAt: "first", LastSeenAt: "last"}
+	server, err := socket.NewServer(socketPath, func(_ context.Context, request socket.Request) (any, error) {
+		switch request.Action {
+		case socket.ActionIssuesList:
+			return []events.Event{event}, nil
+		case socket.ActionIssuesGet:
+			return events.Detail{
+				Event:       event,
+				Occurrences: []events.OccurrenceDetail{{ID: 1, OccurredAt: "now", Line: "disk full 95"}},
+			}, nil
+		default:
+			t.Fatalf("unexpected action %q", request.Action)
+			return nil, nil
+		}
+	})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	if err := server.Listen(); err != nil {
+		t.Fatalf("Listen returned error: %v", err)
+	}
+	t.Cleanup(func() { server.Close() })
+
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"--socket", socketPath, "issues"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("issues exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if got := strings.TrimSpace(stdout.String()); got != "7\tcritical\tdisk\t3\tdisk full" {
+		t.Fatalf("issues output = %q", got)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"--socket", socketPath, "issues", "7"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("issues get exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Issue 7 [critical] disk full") || !strings.Contains(stdout.String(), "disk full 95") {
+		t.Fatalf("issues get output = %q", stdout.String())
 	}
 }
 

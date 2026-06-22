@@ -13,6 +13,7 @@ import (
 	"github.com/BrandonYaniz/yllmlog/internal/app"
 	"github.com/BrandonYaniz/yllmlog/internal/config"
 	"github.com/BrandonYaniz/yllmlog/internal/db"
+	"github.com/BrandonYaniz/yllmlog/internal/events"
 	"github.com/BrandonYaniz/yllmlog/internal/logs"
 	"github.com/BrandonYaniz/yllmlog/internal/socket"
 	"github.com/BrandonYaniz/yllmlog/internal/version"
@@ -23,6 +24,7 @@ type Daemon struct {
 	cfg     config.Config
 	db      *sql.DB
 	logs    logs.Store
+	events  events.Store
 	process app.Processor
 	server  *socket.Server
 
@@ -53,6 +55,7 @@ func New(ctx context.Context, cfg config.Config, migrationsFS fs.FS, migrationsD
 		cfg:          cfg,
 		db:           database,
 		logs:         logs.NewStore(database),
+		events:       events.NewStore(database),
 		process:      app.NewProcessor(database),
 		pollInterval: 5 * time.Second,
 	}
@@ -117,6 +120,14 @@ func (d *Daemon) handle(ctx context.Context, request socket.Request) (any, error
 			return nil, err
 		}
 		return nil, d.logs.Remove(ctx, params.Path)
+	case socket.ActionIssuesList:
+		return d.events.List(ctx)
+	case socket.ActionIssuesGet:
+		var params socket.IssuesGetParams
+		if err := decodeParams(request, &params); err != nil {
+			return nil, err
+		}
+		return d.events.Get(ctx, params.ID)
 	default:
 		return nil, fmt.Errorf("unknown action %q", request.Action)
 	}
