@@ -1,0 +1,2 @@
+ALTER TABLE rules ADD COLUMN matcher TEXT NOT NULL DEFAULT 'contains';
+ALTER TABLE rules ADD COLUMN field TEXT;
