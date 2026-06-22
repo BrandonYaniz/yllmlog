@@ -15,6 +15,7 @@ import (
 	"github.com/BrandonYaniz/yllmlog/internal/db"
 	"github.com/BrandonYaniz/yllmlog/internal/events"
 	"github.com/BrandonYaniz/yllmlog/internal/logs"
+	"github.com/BrandonYaniz/yllmlog/internal/reports"
 	"github.com/BrandonYaniz/yllmlog/internal/socket"
 	"github.com/BrandonYaniz/yllmlog/internal/version"
 )
@@ -25,6 +26,7 @@ type Daemon struct {
 	db      *sql.DB
 	logs    logs.Store
 	events  events.Store
+	reports reports.Generator
 	process app.Processor
 	server  *socket.Server
 
@@ -56,6 +58,7 @@ func New(ctx context.Context, cfg config.Config, migrationsFS fs.FS, migrationsD
 		db:           database,
 		logs:         logs.NewStore(database),
 		events:       events.NewStore(database),
+		reports:      reports.NewGenerator(database),
 		process:      app.NewProcessor(database),
 		pollInterval: 5 * time.Second,
 	}
@@ -128,8 +131,26 @@ func (d *Daemon) handle(ctx context.Context, request socket.Request) (any, error
 			return nil, err
 		}
 		return d.events.Get(ctx, params.ID)
+	case socket.ActionReportsGenerate:
+		var params socket.ReportsGenerateParams
+		if err := decodeParams(request, &params); err != nil {
+			return nil, err
+		}
+		return d.generateReport(ctx, reports.Kind(params.Kind))
 	default:
 		return nil, fmt.Errorf("unknown action %q", request.Action)
+	}
+}
+
+func (d *Daemon) generateReport(ctx context.Context, kind reports.Kind) (reports.Report, error) {
+	now := time.Now()
+	switch kind {
+	case reports.KindDaily:
+		return d.reports.Generate(ctx, kind, now.Add(-24*time.Hour), now)
+	case reports.KindWeekly:
+		return d.reports.Generate(ctx, kind, now.Add(-7*24*time.Hour), now)
+	default:
+		return reports.Report{}, fmt.Errorf("unsupported report kind %q", kind)
 	}
 }
 

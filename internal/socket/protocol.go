@@ -3,12 +3,13 @@ package socket
 import "encoding/json"
 
 const (
-	ActionStatus     = "status"
-	ActionLogsList   = "logs.list"
-	ActionLogsAdd    = "logs.add"
-	ActionLogsRemove = "logs.remove"
-	ActionIssuesList = "issues.list"
-	ActionIssuesGet  = "issues.get"
+	ActionStatus          = "status"
+	ActionLogsList        = "logs.list"
+	ActionLogsAdd         = "logs.add"
+	ActionLogsRemove      = "logs.remove"
+	ActionIssuesList      = "issues.list"
+	ActionIssuesGet       = "issues.get"
+	ActionReportsGenerate = "reports.generate"
 )
 
 // Request is one daemon API request.
@@ -45,4 +46,8 @@ type LogsRemoveParams struct {
 
 type IssuesGetParams struct {
 	ID int64 `json:"id"`
+}
+
+type ReportsGenerateParams struct {
+	Kind string `json:"kind"`
 }

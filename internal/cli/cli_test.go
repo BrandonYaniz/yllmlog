@@ -9,6 +9,7 @@ import (
 
 	"github.com/BrandonYaniz/yllmlog/internal/events"
 	"github.com/BrandonYaniz/yllmlog/internal/logs"
+	"github.com/BrandonYaniz/yllmlog/internal/reports"
 	"github.com/BrandonYaniz/yllmlog/internal/socket"
 )
 
@@ -20,6 +21,39 @@ func TestRunVersion(t *testing.T) {
 	}
 	if strings.TrimSpace(stdout.String()) == "" {
 		t.Fatal("version output is empty")
+	}
+}
+
+func TestRunReportsCommand(t *testing.T) {
+	socketPath := t.TempDir() + "/yllmlog.sock"
+	server, err := socket.NewServer(socketPath, func(_ context.Context, request socket.Request) (any, error) {
+		if request.Action != socket.ActionReportsGenerate {
+			t.Fatalf("unexpected action %q", request.Action)
+		}
+		var params socket.ReportsGenerateParams
+		if err := json.Unmarshal(request.Params, &params); err != nil {
+			return nil, err
+		}
+		if params.Kind != "daily" {
+			t.Fatalf("report kind = %q", params.Kind)
+		}
+		return reports.Report{ID: 1, Kind: reports.KindDaily, Body: "daily body\n"}, nil
+	})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	if err := server.Listen(); err != nil {
+		t.Fatalf("Listen returned error: %v", err)
+	}
+	t.Cleanup(func() { server.Close() })
+
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"--socket", socketPath, "reports", "daily"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("reports exit code = %d, stderr = %s", code, stderr.String())
+	}
+	if stdout.String() != "daily body\n" {
+		t.Fatalf("reports output = %q", stdout.String())
 	}
 }
 
